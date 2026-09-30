@@ -77,3 +77,9 @@ curl http://localhost:8030/v1/audio/voices \
 # Start with Docker Compose
 docker compose up -d
 ```
+
+---
+
+## 📄 License
+
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
