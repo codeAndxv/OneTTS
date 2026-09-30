@@ -1,0 +1,31 @@
+services:
+  onetts:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cpu
+    image: onetts:latest
+    container_name: onetts-server
+    restart: unless-stopped
+    ports:
+      - "8030:8030"
+    volumes:
+      # 1. 配置文件（只读挂载）
+      - ./config.yaml:/app/config.yaml:ro
+      # 2. 统一持久化数据目录（音色、数据库、模型、缓存）
+      - ./data:/app/data:rw
+    environment:
+      - ONETTS_DEBUG=false
+    # GPU 部署时取消注释：
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8030/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

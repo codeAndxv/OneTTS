@@ -1,0 +1,58 @@
+# OneTTS 配置文件
+
+# API Key（所有接口必须携带此 key，支持 Bearer / X-API-Key）
+api_key: sk-onetts-v1-k9L3mX8QZ2sT4vA7wE1rY6u
+
+# TTS 全局切片与缓存配置
+TTS-Toolkit:
+  # 音频合成智能缓存
+  cache:
+    enable: true
+    cache_dir: "data/outputs/cache"
+    max_cache_size_mb: 1024
+
+  # 长文本流式切片分句
+  text_splitter:
+    enable: true
+    max_chunk_chars: 80
+    split_delimiters: "。！？!?；;\n"
+
+# TTS Provider 引擎配置
+TTS-Providers:
+
+  # 1. Edge-TTS 引擎（微软 Azure Neural 语音，免显卡开箱即用，支持上百种高质量多语言音色）
+  edgetts:
+    enable: true
+    engine: edgetts
+    default_voice: "zh-CN-XiaoxiaoNeural"
+    # OpenAI 标准音色名向 Edge-TTS 映射别名
+    voice_aliases:
+      alloy: "zh-CN-XiaoxiaoNeural"
+      echo: "zh-CN-YunxiNeural"
+      fable: "zh-CN-YunjianNeural"
+      onyx: "zh-CN-YunyangNeural"
+      nova: "zh-CN-XiaoyiNeural"
+      shimmer: "zh-CN-liaoning-XiaobeiNeural"
+      zh-female-1: "zh-CN-XiaoxiaoNeural"
+      zh-male-1: "zh-CN-YunxiNeural"
+      en-female-1: "en-US-JennyNeural"
+      en-male-1: "en-US-GuyNeural"
+      ja-female-1: "ja-JP-NanamiNeural"
+      ja-male-1: "ja-JP-KeitaNeural"
+
+  # 2. OpenAI TTS 官方/三方中转代理引擎
+  openai:
+    enable: false
+    engine: openai
+    base_url: "https://api.openai.com/v1"
+    api_key: ""
+    models:
+      - "tts-1"
+      - "tts-1-hd"
+
+  # 3. Kokoro 本地轻量 ONNX 引擎（82M 超轻量，低延迟高自然度）
+  kokoro:
+    enable: false
+    engine: kokoro
+    model_path: "data/models/kokoro-v0_19.onnx"
+    voices_path: "data/models/voices.bin"
