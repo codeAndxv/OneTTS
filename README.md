@@ -1,6 +1,12 @@
 # OneTTS: Unified Text-to-Speech (TTS) Aggregation Service
 
+<p align="center">
+  <img src="./docs/assets/OneTTS.svg" width="128" alt="OneTTS Logo">
+</p>
+
 OneTTS is an enterprise-grade, high-performance Text-to-Speech (TTS) engine aggregation gateway. It provides full compatibility with the **OpenAI `/v1/audio/speech`** standard while supporting multiple pluggable open-source and commercial TTS backends.
+
+[中文文档](README_CN.md)
 
 ---
 

@@ -1,6 +1,12 @@
 # OneTTS: 统一多引擎语音合成 (TTS) 聚合服务
 
+<p align="center">
+  <img src="./docs/assets/OneTTS.svg" width="128" alt="OneTTS Logo">
+</p>
+
 OneTTS 是一个开箱即用、高性能的语音合成 (Text-to-Speech) 引擎聚合网关与服务。它原生兼容 **OpenAI `/v1/audio/speech`** 接口协议，并支持多款开源与商业级 TTS 后端插件式接入。
+
+[English Documentation](README.md)
 
 ---
 
