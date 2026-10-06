@@ -75,8 +75,12 @@ class AppConfig:
 
 class Settings(BaseSettings):
     app_name: str = "OneTTS"
+    app_version: str = "0.1.0"
+    api_version: str = "0.1.0"
     debug: bool = False
 
 
 settings = Settings()
 app_config = AppConfig()
+API_VERSION = settings.api_version
+

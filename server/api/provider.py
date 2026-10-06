@@ -2,12 +2,23 @@
 
 from fastapi import APIRouter, Depends
 from server.api.auth import get_api_key
-from server.core.config import app_config
+from server.core.config import API_VERSION, app_config, settings
 
-router = APIRouter(prefix="/v1", tags=["providers"], dependencies=[Depends(get_api_key)])
+router = APIRouter(prefix="/v1", tags=["providers"])
 
 
-@router.get("/providers")
+@router.get("/info")
+async def get_service_info():
+    """返回 OneTTS 服务与接口协议版本信息。"""
+    return {
+        "service": "OneTTS",
+        "app_version": settings.app_version,
+        "api_version": API_VERSION,
+        "status": "ok",
+    }
+
+
+@router.get("/providers", dependencies=[Depends(get_api_key)])
 async def list_providers():
     """获取所有底层 TTS Provider 的配置与健康状态。"""
     res = {}
@@ -18,4 +29,7 @@ async def list_providers():
             "default_voice": cfg.default_voice,
             "voice_aliases": cfg.voice_aliases,
         }
-    return {"providers": res}
+    return {
+        "api_version": API_VERSION,
+        "providers": res,
+    }
