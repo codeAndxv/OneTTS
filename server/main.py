@@ -8,7 +8,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from server.api import model, provider, speech, voices
+from server.api import (
+    model,
+    provider,
+    speech,
+    tts_clones,
+    tts_generate,
+    tts_realtime,
+    tts_tasks,
+    voices,
+)
 from server.core.config import settings
 from server.core.errors import (
     OpenAIAPIException,
@@ -44,6 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── 轨道一：OpenAI 标准兼容体系 ───────────────────────────────────
 # 统一语音合成 API (OpenAI /v1/audio/speech)
 app.include_router(speech.router)
 
@@ -55,6 +65,21 @@ app.include_router(model.router)
 
 # Provider 信息 API (/v1/providers)
 app.include_router(provider.router)
+
+
+# ── 轨道二：OneTTS 专属高级扩展体系 (/v1/tts/...) ─────────────────
+# 高级结构化合成与字幕导出 (/v1/tts/generate)
+app.include_router(tts_generate.router)
+
+# 异步长文演播与多角色剧本任务 (/v1/tts/tasks)
+app.include_router(tts_tasks.router)
+
+# 声音克隆与专属声音资产库 (/v1/tts/clones)
+app.include_router(tts_clones.router)
+
+# 全双工实时流式推流 WebSocket (/v1/tts/realtime)
+app.include_router(tts_realtime.router)
+
 
 
 # ── 全局错误拦截器 ──────────────────────────────────────────────

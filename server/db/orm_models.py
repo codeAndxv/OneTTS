@@ -42,3 +42,42 @@ class SynthesisLog(Base):
     duration_sec = Column(Float, default=0.0)
     cached = Column(Integer, default=0)  # 0: 实时合成, 1: 命中缓存
     created_at = Column(DateTime, default=_utc_now)
+
+
+class TTSTaskRecord(Base):
+    """异步长文与多角色演播任务表。"""
+
+    __tablename__ = "tts_tasks"
+
+    id = Column(String(64), primary_key=True, default=lambda: f"tts_task_{uuid.uuid4().hex[:12]}")
+    title = Column(String(256), nullable=False)
+    model = Column(String(64), nullable=False)
+    voice = Column(String(128), nullable=False)
+    status = Column(String(32), default="pending", index=True)  # pending, running, completed, failed, cancelled
+    progress = Column(Float, default=0.0)
+    total_segments = Column(Integer, default=0)
+    completed_segments = Column(Integer, default=0)
+    dialogue_json = Column(Text, nullable=True)
+    audio_path = Column(String(512), nullable=True)
+    srt_path = Column(String(512), nullable=True)
+    duration_seconds = Column(Float, default=0.0)
+    webhook_url = Column(String(512), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=_utc_now)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now)
+
+
+class VoiceCloneRecord(Base):
+    """持久化克隆声音资产库。"""
+
+    __tablename__ = "voice_clones"
+
+    id = Column(String(64), primary_key=True, default=lambda: f"clone_{uuid.uuid4().hex[:10]}")
+    name = Column(String(128), nullable=False)
+    description = Column(Text, nullable=True)
+    language = Column(String(32), default="zh-CN")
+    prompt_text = Column(Text, nullable=True)
+    audio_path = Column(String(512), nullable=False)
+    sample_url = Column(String(512), nullable=True)
+    created_at = Column(DateTime, default=_utc_now)
+

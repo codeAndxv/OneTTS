@@ -77,5 +77,56 @@ class SpeechService:
             ):
                 yield chunk
 
+    @staticmethod
+    async def synthesize_advanced(req: "TTSGenerateRequest") -> "TTSResult":
+        """带丰富上下文（情感、语调、参考音频）及字幕生成的高级合成。"""
+        import base64
+        import httpx
+        from server.engines.base import TTSContext, TTSResult
+        from server.schemas.tts_ext import TTSGenerateRequest
+
+        provider_name, actual_voice = voice_service.resolve_voice(req.model, req.voice)
+        engine = get_engine(provider_name)
+
+        ctx = TTSContext(
+            text=req.text,
+            voice=actual_voice,
+            speed=req.speed,
+            pitch=req.pitch,
+            volume=req.volume,
+            language=req.language,
+            emotion=req.emotion,
+            prompt_text=req.prompt_text,
+            clone_voice_id=req.clone_voice_id,
+            with_subtitles=req.with_subtitles,
+            response_format=req.response_format,
+        )
+
+        # 解析临时参考音频 (URL 或 Base64)
+        if req.prompt_audio:
+            if req.prompt_audio.startswith("http://") or req.prompt_audio.startswith("https://"):
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.get(req.prompt_audio)
+                        if resp.is_success:
+                            ctx.prompt_audio_bytes = resp.content
+                except Exception as e:
+                    logger.warning("下载 prompt_audio 失败: %s", e)
+            else:
+                try:
+                    raw_b64 = req.prompt_audio.split(",")[-1]
+                    ctx.prompt_audio_bytes = base64.b64decode(raw_b64)
+                except Exception as e:
+                    logger.warning("Base64 解码 prompt_audio 失败: %s", e)
+
+        # 若指定了持久化声音克隆资产 ID
+        if req.clone_voice_id and not ctx.prompt_audio_bytes:
+            from server.services.clone_service import clone_service
+            sample_data = await clone_service.get_clone_audio_bytes(req.clone_voice_id)
+            if sample_data:
+                ctx.prompt_audio_bytes = sample_data
+
+        return await engine.synthesize_with_context(ctx)
+
 
 speech_service = SpeechService()

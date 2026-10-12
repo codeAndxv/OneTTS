@@ -1,8 +1,8 @@
 """Kokoro ONNX 82M 轻量本地 TTS 引擎适配器。"""
 
 import logging
-from typing import AsyncGenerator
-from server.engines.base import BaseTTSEngine
+from typing import Any, AsyncGenerator
+from server.engines.base import BaseTTSEngine, TTSContext, TTSResult
 from server.schemas.voice import VoiceInfo
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,9 @@ class KokoroEngine(BaseTTSEngine):
         response_format: str = "mp3",
     ) -> bytes:
         raise NotImplementedError("Kokoro 引擎模型文件未下载或处于离线插槽模式。请在 config.yaml 中配置 model_path 或使用 edgetts 引擎。")
+
+    async def synthesize_with_context(self, ctx) -> Any:
+        raise NotImplementedError("Kokoro 引擎模型文件未下载或处于离线插槽模式。")
 
     async def stream_synthesize(
         self,

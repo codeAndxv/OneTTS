@@ -5,7 +5,7 @@ import logging
 from typing import AsyncGenerator
 import edge_tts
 
-from server.engines.base import BaseTTSEngine
+from server.engines.base import BaseTTSEngine, TTSContext, TTSResult
 from server.schemas.voice import VoiceInfo
 from server.utils.audio_encoder import encode_audio
 
@@ -112,6 +112,22 @@ def _format_rate(speed: float) -> str:
     return f"{percent}%"
 
 
+def _format_pitch(pitch: float) -> str:
+    """将音高浮点偏移 (-50.0 ~ +50.0) 格式化为 Edge-TTS 期望的 '+10Hz' 或 '+5%'。"""
+    val = int(round(pitch))
+    if val >= 0:
+        return f"+{val}Hz"
+    return f"{val}Hz"
+
+
+def _format_volume(volume: float) -> str:
+    """将音量倍率 (0.1 ~ 2.0) 格式化为百分比 (+0%, -20%)。"""
+    percent = int(round((volume - 1.0) * 100))
+    if percent >= 0:
+        return f"+{percent}%"
+    return f"{percent}%"
+
+
 class EdgeTTSEngine(BaseTTSEngine):
     """Edge-TTS 引擎实现。"""
 
@@ -126,22 +142,74 @@ class EdgeTTSEngine(BaseTTSEngine):
         speed: float = 1.0,
         response_format: str = "mp3",
     ) -> bytes:
-        target_voice = voice or self.default_voice
-        rate_str = _format_rate(speed)
+        ctx = TTSContext(
+            text=text,
+            voice=voice,
+            speed=speed,
+            response_format=response_format,
+        )
+        res = await self.synthesize_with_context(ctx)
+        return res.audio_bytes
 
-        communicate = edge_tts.Communicate(text, target_voice, rate=rate_str)
+    async def synthesize_with_context(self, ctx: TTSContext) -> TTSResult:
+        target_voice = ctx.voice or self.default_voice
+        rate_str = _format_rate(ctx.speed)
+        pitch_str = _format_pitch(ctx.pitch)
+        volume_str = _format_volume(ctx.volume)
+
+        communicate = edge_tts.Communicate(
+            ctx.text,
+            target_voice,
+            rate=rate_str,
+            pitch=pitch_str,
+            volume=volume_str,
+        )
         audio_buffer = io.BytesIO()
+        word_boundaries: list[dict] = []
 
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 audio_buffer.write(chunk["data"])
+            elif chunk["type"] == "WordBoundary":
+                word_boundaries.append(chunk)
 
         mp3_bytes = audio_buffer.getvalue()
-        if response_format.lower() == "mp3":
-            return mp3_bytes
+        output_bytes = mp3_bytes
+        if ctx.response_format.lower() != "mp3":
+            output_bytes = encode_audio(mp3_bytes, target_format=ctx.response_format)
 
-        # 若要求非 MP3 格式，通过统一编码工具进行转码
-        return encode_audio(mp3_bytes, target_format=response_format)
+        duration_sec = 0.0
+        if word_boundaries:
+            last = word_boundaries[-1]
+            duration_sec = round((last["offset"] + last["duration"]) / 10_000_000.0, 3)
+        if duration_sec <= 0:
+            duration_sec = max(round(len(ctx.text) / (4.0 * ctx.speed), 3), 0.5)
+
+        cues = []
+        srt_text = ""
+        vtt_text = ""
+        if ctx.with_subtitles:
+            from server.utils.subtitle_generator import build_cues_from_sentences, generate_srt, generate_vtt
+            from server.utils.text_splitter import split_text_into_sentences
+
+            sentences = split_text_into_sentences(ctx.text)
+            if sentences:
+                total_chars = max(sum(len(s) for s in sentences), 1)
+                durations = [(len(s) / total_chars) * duration_sec for s in sentences]
+                cues = build_cues_from_sentences(sentences, durations)
+                srt_text = generate_srt(cues)
+                vtt_text = generate_vtt(cues)
+
+        from server.engines.base import TTSResult
+        return TTSResult(
+            audio_bytes=output_bytes,
+            format=ctx.response_format,
+            duration_seconds=duration_sec,
+            sample_rate=24000,
+            subtitles=cues,
+            srt_content=srt_text,
+            vtt_content=vtt_text,
+        )
 
     async def stream_synthesize(
         self,
@@ -150,17 +218,38 @@ class EdgeTTSEngine(BaseTTSEngine):
         speed: float = 1.0,
         response_format: str = "mp3",
     ) -> AsyncGenerator[bytes, None]:
-        target_voice = voice or self.default_voice
-        rate_str = _format_rate(speed)
+        ctx = TTSContext(
+            text=text,
+            voice=voice,
+            speed=speed,
+            response_format=response_format,
+        )
+        async for chunk in self.stream_synthesize_with_context(ctx):
+            yield chunk
 
-        communicate = edge_tts.Communicate(text, target_voice, rate=rate_str)
+    async def stream_synthesize_with_context(
+        self,
+        ctx: TTSContext,
+    ) -> AsyncGenerator[bytes, None]:
+        target_voice = ctx.voice or self.default_voice
+        rate_str = _format_rate(ctx.speed)
+        pitch_str = _format_pitch(ctx.pitch)
+        volume_str = _format_volume(ctx.volume)
+
+        communicate = edge_tts.Communicate(
+            ctx.text,
+            target_voice,
+            rate=rate_str,
+            pitch=pitch_str,
+            volume=volume_str,
+        )
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 data = chunk["data"]
-                if response_format.lower() == "mp3":
+                if ctx.response_format.lower() == "mp3":
                     yield data
                 else:
-                    yield encode_audio(data, target_format=response_format)
+                    yield encode_audio(data, target_format=ctx.response_format)
 
     def list_voices(self) -> list[VoiceInfo]:
         return list(DEFAULT_EDGETTS_VOICES)

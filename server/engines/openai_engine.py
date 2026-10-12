@@ -4,7 +4,7 @@ import logging
 from typing import AsyncGenerator
 import httpx
 
-from server.engines.base import BaseTTSEngine
+from server.engines.base import BaseTTSEngine, TTSContext, TTSResult
 from server.schemas.voice import VoiceInfo
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,39 @@ class OpenAITTSEngine(BaseTTSEngine):
             resp = await client.post(f"{self.base_url}/audio/speech", json=payload, headers=headers)
             resp.raise_for_status()
             return resp.content
+
+    async def synthesize_with_context(self, ctx: TTSContext) -> TTSResult:
+        audio_bytes = await self.synthesize(
+            text=ctx.text,
+            voice=ctx.voice,
+            speed=ctx.speed,
+            response_format=ctx.response_format,
+        )
+        dur = max(round(len(ctx.text) / (4.0 * ctx.speed), 3), 0.5)
+        cues = []
+        srt_text = ""
+        vtt_text = ""
+        if ctx.with_subtitles:
+            from server.utils.subtitle_generator import build_cues_from_sentences, generate_srt, generate_vtt
+            from server.utils.text_splitter import split_text_into_sentences
+
+            sentences = split_text_into_sentences(ctx.text)
+            if sentences:
+                total_chars = max(sum(len(s) for s in sentences), 1)
+                durations = [(len(s) / total_chars) * dur for s in sentences]
+                cues = build_cues_from_sentences(sentences, durations)
+                srt_text = generate_srt(cues)
+                vtt_text = generate_vtt(cues)
+
+        return TTSResult(
+            audio_bytes=audio_bytes,
+            format=ctx.response_format,
+            duration_seconds=dur,
+            sample_rate=24000,
+            subtitles=cues,
+            srt_content=srt_text,
+            vtt_content=vtt_text,
+        )
 
     async def stream_synthesize(
         self,
