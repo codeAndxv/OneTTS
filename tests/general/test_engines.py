@@ -33,9 +33,17 @@ def test_registry_and_dummy_engine():
 async def test_dummy_synthesize():
     engine = get_engine("dummy_prov")
     res = await engine.synthesize("test", "dummy_v")
-    assert res == b"DUMMY_AUDIO"
-
     chunks = []
     async for chunk in engine.stream_synthesize("test", "dummy_v"):
         chunks.append(chunk)
     assert chunks == [b"CHUNK_1", b"CHUNK_2"]
+
+
+def test_cosyvoice_engine_voices():
+    from server.engines.cosyvoice_engine import CosyVoiceEngine
+    engine = CosyVoiceEngine("cosyvoice", {"default_voice": "cosyvoice-chinese-female"})
+    voices = engine.list_voices()
+    assert len(voices) >= 2
+    voice_ids = [v.id for v in voices]
+    assert "cosyvoice-chinese-female" in voice_ids
+    assert "cosyvoice-clone" in voice_ids

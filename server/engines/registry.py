@@ -7,6 +7,7 @@ from server.engines.base import BaseTTSEngine
 from server.engines.edgetts_engine import EdgeTTSEngine
 from server.engines.openai_engine import OpenAITTSEngine
 from server.engines.kokoro_engine import KokoroEngine
+from server.engines.cosyvoice_engine import CosyVoiceEngine
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ _ENGINE_CLASSES: dict[str, Type[BaseTTSEngine]] = {
     "edgetts": EdgeTTSEngine,
     "openai": OpenAITTSEngine,
     "kokoro": KokoroEngine,
+    "cosyvoice": CosyVoiceEngine,
 }
 
 _ACTIVE_INSTANCES: dict[str, BaseTTSEngine] = {}

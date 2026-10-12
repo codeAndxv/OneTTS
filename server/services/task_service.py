@@ -36,16 +36,35 @@ class TaskService:
         """创建并入队异步长文/剧本任务。"""
         task_id = f"tts_task_{uuid.uuid4().hex[:12]}"
 
-        # 1. 解析任务分段 (优先剧本 dialogue，兜底单篇长文本切句)
+        # 1. 解析任务分段 (优先剧本 dialogue，其次 srt_content，兜底单篇长文本切句)
         segments: list[dict[str, Any]] = []
         if req.dialogue:
             for item in req.dialogue:
                 if item.text and item.text.strip():
+                    spk = item.speaker or "默认"
+                    v = item.voice
+                    if not v and req.voice_mapping and spk in req.voice_mapping:
+                        v = req.voice_mapping[spk]
                     segments.append({
-                        "speaker": item.speaker or "默认",
-                        "voice": item.voice or req.default_voice,
+                        "speaker": spk,
+                        "voice": v or req.default_voice,
                         "text": item.text.strip(),
                     })
+        elif req.srt_content:
+            from server.services.dubbing_service import parse_srt_to_cues
+            cues = parse_srt_to_cues(req.srt_content)
+            for c in cues:
+                spk = c.speaker or "默认"
+                v = c.voice
+                if not v and req.voice_mapping and spk in req.voice_mapping:
+                    v = req.voice_mapping[spk]
+                segments.append({
+                    "speaker": spk,
+                    "voice": v or req.default_voice,
+                    "text": c.text,
+                    "start_seconds": c.start_seconds,
+                    "end_seconds": c.end_seconds,
+                })
         elif req.text:
             raw_sentences = split_text_into_sentences(req.text)
             for s in raw_sentences:
@@ -100,6 +119,9 @@ class TaskService:
         audio_parts: list[bytes] = []
         combined_cues: list[SubtitleCue] = []
         current_time_offset = 0.0
+        from server.utils.audio_stitcher import AudioTimelineTrack
+        track = AudioTimelineTrack(sample_rate=24000)
+        has_explicit_timeline = any("start_seconds" in seg for seg in segments)
 
         try:
             for idx, seg in enumerate(segments, start=1):
@@ -116,9 +138,16 @@ class TaskService:
                         await session.commit()
                     return
 
+                # 若有显式时间轴（如来自 srt_content），在合成前填充静音留白
+                if has_explicit_timeline and "start_seconds" in seg:
+                    target_start = float(seg["start_seconds"])
+                    track.pad_to_timestamp(target_start)
+
                 provider_name, actual_voice = voice_service.resolve_voice(req.model, seg["voice"])
                 engine = get_engine(provider_name)
 
+                # 时间轴模式或 WAV 输出采用 WAV 保持高保真和无损拼接
+                segment_format = "wav" if (has_explicit_timeline or req.response_format == "wav") else req.response_format
                 ctx = TTSContext(
                     text=seg["text"],
                     voice=actual_voice,
@@ -126,16 +155,29 @@ class TaskService:
                     pitch=req.pitch,
                     volume=req.volume,
                     with_subtitles=req.with_subtitles,
-                    response_format=req.response_format,
+                    response_format=segment_format,
                 )
 
                 res = await engine.synthesize_with_context(ctx)
                 audio_parts.append(res.audio_bytes)
 
+                if has_explicit_timeline or req.response_format == "wav":
+                    track.append_wav(res.audio_bytes)
+                    if has_explicit_timeline and "end_seconds" in seg:
+                        target_end = float(seg["end_seconds"])
+                        if track.current_duration_seconds < target_end:
+                            track.append_silence(target_end - track.current_duration_seconds)
+
                 # 累加字幕时间轴
-                seg_duration = max(res.duration_seconds, 0.5)
-                seg_start = current_time_offset
-                seg_end = current_time_offset + seg_duration
+                if has_explicit_timeline and "start_seconds" in seg:
+                    seg_start = float(seg["start_seconds"])
+                    seg_end = float(seg.get("end_seconds", track.current_duration_seconds))
+                    current_time_offset = max(current_time_offset, track.current_duration_seconds)
+                else:
+                    seg_duration = max(res.duration_seconds, 0.5)
+                    seg_start = current_time_offset
+                    seg_end = current_time_offset + seg_duration
+                    current_time_offset = seg_end
 
                 combined_cues.append(
                     SubtitleCue(
@@ -147,7 +189,6 @@ class TaskService:
                         end_time=format_timestamp(seg_end, ","),
                     )
                 )
-                current_time_offset = seg_end
 
                 # 更新进度
                 progress = round(100.0 * idx / len(segments), 1)
@@ -160,7 +201,17 @@ class TaskService:
                     await session.commit()
 
             # 合并产物落盘
-            final_audio = b"".join(audio_parts)
+            if has_explicit_timeline or req.response_format == "wav":
+                final_audio = track.to_wav_bytes()
+                if req.response_format == "mp3":
+                    from server.utils.audio_encoder import audio_encoder
+                    try:
+                        final_audio = audio_encoder.encode(final_audio, "wav", "mp3")
+                    except Exception:
+                        pass
+            else:
+                final_audio = b"".join(audio_parts)
+
             audio_filename = f"{task_id}.{req.response_format}"
             audio_path = TASKS_DIR / audio_filename
             audio_path.write_bytes(final_audio)

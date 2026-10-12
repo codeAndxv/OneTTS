@@ -13,6 +13,7 @@ from server.api import (
     provider,
     speech,
     tts_clones,
+    tts_dubbing,
     tts_generate,
     tts_realtime,
     tts_tasks,
@@ -79,6 +80,9 @@ app.include_router(tts_clones.router)
 
 # 全双工实时流式推流 WebSocket (/v1/tts/realtime)
 app.include_router(tts_realtime.router)
+
+# 字幕时间轴对齐配音与留白生成 (/v1/tts/dubbing)
+app.include_router(tts_dubbing.router)
 
 
 

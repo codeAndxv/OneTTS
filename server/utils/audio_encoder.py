@@ -83,3 +83,31 @@ def encode_audio(
             )
 
     return pcm_to_wav(audio_data if isinstance(audio_data, bytes) else audio_data.tobytes(), sample_rate)
+
+
+class AudioEncoder:
+    """统一音频格式转码适配器。"""
+
+    @staticmethod
+    def encode(
+        audio_data: bytes | np.ndarray,
+        source_format: str = "wav",
+        target_format: str = "mp3",
+        sample_rate: int = 24000,
+    ) -> bytes:
+        """从源格式或原始采样转码至目标格式。"""
+        if target_format.lower() == source_format.lower() and isinstance(audio_data, bytes):
+            return audio_data
+
+        if source_format.lower() == "wav" and isinstance(audio_data, bytes):
+            try:
+                with io.BytesIO(audio_data) as bio:
+                    data, sr = sf.read(bio, dtype="int16")
+                    return encode_audio(data, target_format=target_format, sample_rate=sr)
+            except Exception:
+                pass
+
+        return encode_audio(audio_data, target_format=target_format, sample_rate=sample_rate)
+
+
+audio_encoder = AudioEncoder()

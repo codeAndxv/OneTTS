@@ -118,9 +118,60 @@ class TTSTaskCreateRequest(BaseModel):
     pitch: float = Field(default=0.0, ge=-50.0, le=50.0, description="默认音高")
     volume: float = Field(default=1.0, ge=0.1, le=2.0, description="默认音量")
     with_subtitles: bool = Field(default=True, description="是否同时生成配套字幕")
-    text: str | None = Field(default=None, description="单篇长文本全文 (与 dialogue 二选一)")
+    text: str | None = Field(default=None, description="单篇长文本全文 (与 dialogue/srt 二选一)")
     dialogue: list[TTSDialogueSegment] | None = Field(default=None, description="多角色剧本分段数组")
+    srt_content: str | None = Field(default=None, description="SRT 字幕文本（带时间轴与留白空间）")
+    voice_mapping: dict[str, str] | None = Field(
+        default=None,
+        description="角色/说话人到音色的绑定映射表，如 {'Speaker 0': 'alloy', '解说': 'zh-CN-YunxiNeural'}",
+    )
     webhook_url: str | None = Field(default=None, description="任务完成后的 Webhook 通知地址")
+
+
+class TTSDubbingCueItem(BaseModel):
+    """单条字幕配音分段。"""
+
+    start_seconds: float = Field(..., description="绝对起始时间（秒）")
+    end_seconds: float = Field(..., description="绝对结束时间（秒）")
+    text: str = Field(..., min_length=1, description="待配音文本")
+    speaker: str | None = Field(default=None, description="说话人标识 (如 'Speaker 0')")
+    voice: str | None = Field(default=None, description="专属音色（覆盖默认音色）")
+
+
+class TTSDubbingRequest(BaseModel):
+    """/v1/tts/dubbing 字幕时间轴配音请求（带真实留白空间与对齐）。"""
+
+    model: str = Field(default="edgetts", description="TTS 模型标识")
+    default_voice: str = Field(default="alloy", description="默认音色")
+    voice_mapping: dict[str, str] | None = Field(
+        default=None,
+        description="角色/说话人到音色的绑定映射表，如 {'Speaker 0': 'alloy', '解说': 'zh-CN-YunxiNeural'}",
+    )
+    cues: list[TTSDubbingCueItem] | None = Field(default=None, description="分条字幕项列表")
+    srt_content: str | None = Field(default=None, description="原始 SRT 字幕文本（与 cues 二选一）")
+    response_format: Literal["mp3", "wav"] = Field(default="mp3", description="合成音频格式")
+    speed: float = Field(default=1.0, ge=0.25, le=4.0, description="语速倍率")
+    pitch: float = Field(default=0.0, ge=-50.0, le=50.0, description="音高微调")
+    volume: float = Field(default=1.0, ge=0.1, le=2.0, description="音量倍率")
+    auto_speedup: bool = Field(
+        default=True,
+        description="当单句合成音频超出字幕时间窗口时，是否自动微调加速以防挤占后续时间",
+    )
+    output_mode: Literal["audio", "json"] = Field(
+        default="audio",
+        description="返回模式：'audio' 直接返回对齐音频文件流；'json' 返回详情与 Base64",
+    )
+
+
+class TTSDubbingResponse(BaseModel):
+    """/v1/tts/dubbing 响应实体。"""
+
+    audio_base64: str = Field(..., description="对齐合成音频的 Base64 字符串")
+    format: str = "mp3"
+    total_duration_seconds: float = 0.0
+    total_cues: int = 0
+    silence_gaps_count: int = 0
+    total_silence_duration: float = 0.0
 
 
 class TTSTaskDetailResponse(BaseModel):

@@ -34,3 +34,6 @@ async def get_api_key(
             },
         )
     return token
+
+
+verify_api_key = get_api_key
