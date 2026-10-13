@@ -1,4 +1,4 @@
-"""OpenAI 兼容语音合成接口 POST /v1/audio/speech。"""
+"""OpenAI 兼容标准语音合成接口 POST /v1/audio/speech。"""
 
 import logging
 from fastapi import APIRouter, Depends, Response
@@ -11,7 +11,7 @@ from server.utils.audio_encoder import get_mime_type
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1/audio", tags=["audio"], dependencies=[Depends(get_api_key)])
+router = APIRouter(prefix="/v1/audio", tags=["Audio-Standard"], dependencies=[Depends(get_api_key)])
 
 
 @router.post("/speech")

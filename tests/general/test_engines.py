@@ -47,3 +47,75 @@ def test_cosyvoice_engine_voices():
     voice_ids = [v.id for v in voices]
     assert "cosyvoice-chinese-female" in voice_ids
     assert "cosyvoice-clone" in voice_ids
+
+
+def test_f5tts_engine_voices_and_synthesis():
+    """测试 F5-TTS 引擎发音人列表、声音克隆参数构造与合成。"""
+    from server.engines.f5tts_engine import F5TTSEngine
+    from server.engines.base import TTSContext
+    import asyncio
+
+    engine = F5TTSEngine("f5tts", {"default_voice": "f5-chinese-female"})
+    voices = engine.list_voices()
+    assert len(voices) >= 3
+    voice_ids = [v.id for v in voices]
+    assert "f5-chinese-female" in voice_ids
+    assert "f5-chinese-male" in voice_ids
+    assert "f5-clone" in voice_ids
+
+    # 测试带参考音频的零样本声音克隆合成与字幕
+    ctx = TTSContext(
+        text="Hello world, testing F5-TTS voice cloning.",
+        voice="f5-clone",
+        prompt_audio_bytes=b"RIFF" + b"\x00" * 2000,
+        prompt_text="Sample reference speech",
+        with_subtitles=True,
+        response_format="wav",
+    )
+    result = asyncio.run(engine.synthesize_with_context(ctx))
+    assert len(result.audio_bytes) > 0
+    assert result.format == "wav"
+    assert result.duration_seconds > 0
+    assert len(result.subtitles) > 0
+    assert len(result.srt_content) > 0
+
+
+def test_doubao_engine_voices_and_synthesis():
+    """测试火山引擎 / 豆包语音合成大模型发音人与合成。"""
+    from server.engines.doubao_engine import DoubaoEngine
+    from server.engines.base import TTSContext
+    import asyncio
+
+    engine = DoubaoEngine("doubao", {
+        "appid": "mock_appid",
+        "access_token": "mock_token",
+        "default_voice": "zh_female_shuangkuai",
+    })
+    voices = engine.list_voices()
+    assert len(voices) >= 5
+    voice_ids = [v.id for v in voices]
+    assert "zh_female_shuangkuai" in voice_ids
+    assert "zh_male_chunhou" in voice_ids
+    assert "zh_male_dongbeikouyin" in voice_ids
+
+    ctx = TTSContext(
+        text="欢迎使用豆包语音大模型合成能力。",
+        voice="zh_female_shuangkuai",
+        with_subtitles=True,
+        response_format="mp3",
+    )
+    result = asyncio.run(engine.synthesize_with_context(ctx))
+    assert len(result.audio_bytes) > 0
+    assert result.format == "mp3"
+    assert result.duration_seconds > 0
+    assert len(result.subtitles) > 0
+
+
+def test_engine_registry_contains_f5_and_doubao():
+    """验证注册表中已收录 f5tts 与 doubao。"""
+    from server.engines.registry import _ENGINE_CLASSES
+    from server.engines.f5tts_engine import F5TTSEngine
+    from server.engines.doubao_engine import DoubaoEngine
+
+    assert _ENGINE_CLASSES["f5tts"] is F5TTSEngine
+    assert _ENGINE_CLASSES["doubao"] is DoubaoEngine

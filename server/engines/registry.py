@@ -8,6 +8,8 @@ from server.engines.edgetts_engine import EdgeTTSEngine
 from server.engines.openai_engine import OpenAITTSEngine
 from server.engines.kokoro_engine import KokoroEngine
 from server.engines.cosyvoice_engine import CosyVoiceEngine
+from server.engines.doubao_engine import DoubaoEngine
+from server.engines.f5tts_engine import F5TTSEngine
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,8 @@ _ENGINE_CLASSES: dict[str, Type[BaseTTSEngine]] = {
     "openai": OpenAITTSEngine,
     "kokoro": KokoroEngine,
     "cosyvoice": CosyVoiceEngine,
+    "f5tts": F5TTSEngine,
+    "doubao": DoubaoEngine,
 }
 
 _ACTIVE_INSTANCES: dict[str, BaseTTSEngine] = {}
@@ -46,7 +50,7 @@ def get_engine(provider_name: str) -> BaseTTSEngine:
     if engine_type not in _ENGINE_CLASSES:
         raise ValueError(f"不支持的 TTS 引擎类型: {engine_type}")
 
-    instance = _ENGINE_CLASSES[engine_type](name=provider_name, config=cfg.raw_config)
+    instance = _ENGINE_CLASSES[engine_type](name=provider_name, config=cfg.combined_config)
     _ACTIVE_INSTANCES[provider_name] = instance
     logger.info("已成功初始化 TTS 引擎实例: %s (%s)", provider_name, engine_type)
     return instance

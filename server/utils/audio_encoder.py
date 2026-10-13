@@ -109,5 +109,17 @@ class AudioEncoder:
 
         return encode_audio(audio_data, target_format=target_format, sample_rate=sample_rate)
 
+    @staticmethod
+    def generate_silence_wav(duration_seconds: float = 1.0, sample_rate: int = 24000) -> bytes:
+        """生成指定时长的合法标准静音 WAV 数据。"""
+        num_frames = int(max(0.1, duration_seconds) * sample_rate)
+        pcm_bytes = b"\x00\x00" * num_frames
+        return pcm_to_wav(pcm_bytes, sample_rate=sample_rate)
+
+    @staticmethod
+    def convert_audio(audio_bytes: bytes, from_fmt: str, to_fmt: str) -> bytes:
+        """便捷音频格式转换接口。"""
+        return AudioEncoder.encode(audio_bytes, source_format=from_fmt, target_format=to_fmt)
+
 
 audio_encoder = AudioEncoder()

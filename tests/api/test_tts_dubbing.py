@@ -7,6 +7,7 @@ import pytest
 
 from server.engines.base import TTSResult
 from server.services.dubbing_service import parse_srt_to_cues
+from tests.helpers.fixture_loader import load_subtitle_fixture
 
 AUTH_HEADERS = {"Authorization": "Bearer onetts-test-key"}
 
@@ -67,7 +68,7 @@ def test_dubbing_endpoint_json_mode(client):
                 {"start_seconds": 4.0, "end_seconds": 5.5, "text": "第二句话"},
             ]
         }
-        resp = client.post("/v1/tts/dubbing", json=payload, headers=AUTH_HEADERS)
+        resp = client.post("/v1/x/audio/dubbing", json=payload, headers=AUTH_HEADERS)
         assert resp.status_code == 200
         data = resp.json()
 
@@ -79,7 +80,7 @@ def test_dubbing_endpoint_json_mode(client):
 
 
 def test_dubbing_endpoint_srt_input(client):
-    """测试 /v1/tts/dubbing 传入 SRT 文本与角色映射。"""
+    """测试 /v1/x/audio/dubbing 传入真实 SRT 夹具文本与角色映射。"""
     mock_wav = _create_mock_wav(1.0)
     mock_res = TTSResult(
         audio_bytes=mock_wav,
@@ -91,25 +92,19 @@ def test_dubbing_endpoint_srt_input(client):
     with patch("server.engines.edgetts_engine.EdgeTTSEngine.synthesize_with_context", new_callable=AsyncMock) as mock_synth:
         mock_synth.return_value = mock_res
 
-        srt_text = """1
-00:00:00,500 --> 00:00:02,000
-[旁白] 很久很久以前。
-
-2
-00:00:03,000 --> 00:00:04,500
-[王子] 我是王子。
-"""
+        srt_text = load_subtitle_fixture("sample_dubbing.srt")
         payload = {
             "model": "edgetts",
             "srt_content": srt_text,
             "voice_mapping": {
-                "旁白": "zh-CN-YunxiNeural",
-                "王子": "zh-CN-YunjianNeural",
+                "Narrator": "zh-CN-YunxiNeural",
+                "Alice": "zh-CN-XiaoxiaoNeural",
+                "Bob": "zh-CN-YunjianNeural",
             },
             "output_mode": "audio",
             "response_format": "wav",
         }
-        resp = client.post("/v1/tts/dubbing", json=payload, headers=AUTH_HEADERS)
+        resp = client.post("/v1/x/audio/dubbing", json=payload, headers=AUTH_HEADERS)
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("audio/")
         assert resp.content.startswith(b"RIFF")

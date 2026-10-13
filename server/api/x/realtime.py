@@ -1,6 +1,5 @@
-"""OneTTS 全双工实时 WebSocket 语音流端点 /v1/tts/realtime。"""
+"""OneTTS 全双工实时 WebSocket 语音流端点 (/v1/x/realtime)。"""
 
-import asyncio
 import base64
 import json
 import logging
@@ -13,12 +12,12 @@ from server.services.voice_service import voice_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1/tts", tags=["tts_realtime"])
+router = APIRouter(prefix="/v1/x", tags=["Realtime-Extended"])
 
 
 @router.websocket("/realtime")
 async def realtime_tts_stream(websocket: WebSocket):
-    """面向实时 AI Agent 的全双工流式 WebSocket 接口。"""
+    """面向实时 AI Agent 的全双工流式 WebSocket 接口 (/v1/x/realtime)。"""
     await websocket.accept()
 
     query_params = websocket.query_params

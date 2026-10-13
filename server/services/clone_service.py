@@ -36,7 +36,7 @@ class CloneService:
         save_path = CLONES_DIR / f"{clone_id}{ext}"
         save_path.write_bytes(audio_bytes)
 
-        sample_url = f"/v1/tts/clones/{clone_id}/sample"
+        sample_url = f"/v1/x/voices/clones/{clone_id}/sample"
 
         async with async_session() as session:
             record = VoiceCloneRecord(

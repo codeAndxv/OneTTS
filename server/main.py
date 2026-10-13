@@ -8,16 +8,17 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from server.api import (
-    model,
-    provider,
-    speech,
-    tts_clones,
-    tts_dubbing,
-    tts_generate,
-    tts_realtime,
-    tts_tasks,
-    voices,
+from server.api.standard import (
+    models as std_models,
+    speech as std_speech,
+)
+from server.api.x import (
+    audio as x_audio,
+    info as x_info,
+    models as x_models,
+    realtime as x_realtime,
+    tasks as x_tasks,
+    voices as x_voices,
 )
 from server.core.config import settings
 from server.core.errors import (
@@ -54,35 +55,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── 轨道一：OpenAI 标准兼容体系 ───────────────────────────────────
+# ── 轨道一：OpenAI 标准兼容体系 (/v1) ───────────────────────────────────
 # 统一语音合成 API (OpenAI /v1/audio/speech)
-app.include_router(speech.router)
+app.include_router(std_speech.router)
 
-# 音色管理与查询 API (/v1/audio/voices)
-app.include_router(voices.router)
-
-# 模型列表 API (OpenAI /v1/models)
-app.include_router(model.router)
-
-# Provider 信息 API (/v1/providers)
-app.include_router(provider.router)
+# 模型列表 API (OpenAI /v1/models, /v1/models/{model_id})
+app.include_router(std_models.router)
 
 
-# ── 轨道二：OneTTS 专属高级扩展体系 (/v1/tts/...) ─────────────────
-# 高级结构化合成与字幕导出 (/v1/tts/generate)
-app.include_router(tts_generate.router)
+# ── 轨道二：OneTTS 专属高级扩展体系 (/v1/x) ─────────────────────────────
+# 高级语音合成与字幕配音 (/v1/x/audio/speech, /v1/x/audio/dubbing)
+app.include_router(x_audio.router)
 
-# 异步长文演播与多角色剧本任务 (/v1/tts/tasks)
-app.include_router(tts_tasks.router)
+# 发音人音色与声音克隆资产 (/v1/x/voices, /v1/x/voices/clones)
+app.include_router(x_voices.router)
 
-# 声音克隆与专属声音资产库 (/v1/tts/clones)
-app.include_router(tts_clones.router)
+# 异步长文演播与多角色剧本任务 (/v1/x/tasks)
+app.include_router(x_tasks.router)
 
-# 全双工实时流式推流 WebSocket (/v1/tts/realtime)
-app.include_router(tts_realtime.router)
+# 全双工实时流式推流 WebSocket (/v1/x/realtime)
+app.include_router(x_realtime.router)
 
-# 字幕时间轴对齐配音与留白生成 (/v1/tts/dubbing)
-app.include_router(tts_dubbing.router)
+# 扩展模型矩阵能力详情 (/v1/x/models)
+app.include_router(x_models.router)
+
+# 服务协议版本与底层 Provider 状态 (/v1/x/info, /v1/x/providers)
+app.include_router(x_info.router)
 
 
 

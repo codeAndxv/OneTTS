@@ -29,3 +29,4 @@ data/models/*
 !data/models/.gitkeep
 data/voices/*
 !data/voices/.gitkeep
+!data/voices/*.json

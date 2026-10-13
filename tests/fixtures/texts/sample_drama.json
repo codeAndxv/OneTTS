@@ -1,0 +1,29 @@
+{
+  "title": "Morning Standup Meeting",
+  "model": "edgetts",
+  "default_voice": "alloy",
+  "response_format": "mp3",
+  "with_subtitles": true,
+  "dialogue": [
+    {
+      "speaker": "Narrator",
+      "voice": "en-US-GuyNeural",
+      "text": "The team gathered online for the weekly synchronization."
+    },
+    {
+      "speaker": "Alice",
+      "voice": "en-US-JennyNeural",
+      "text": "All scheduled benchmark tests have passed successfully."
+    },
+    {
+      "speaker": "Bob",
+      "voice": "en-US-ChristopherNeural",
+      "text": "Excellent progress. Let us proceed to the next milestone."
+    },
+    {
+      "speaker": "Narrator",
+      "voice": "en-US-GuyNeural",
+      "text": "With the agenda completed, the meeting was adjourned."
+    }
+  ]
+}

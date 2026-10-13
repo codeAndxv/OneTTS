@@ -77,3 +77,31 @@ def generate_vtt(cues: list[SubtitleCue]) -> str:
         end_ts = format_timestamp(cue.end_seconds, ".")
         lines.append(f"{cue.index}\n{start_ts} --> {end_ts}\n{cue.text}\n")
     return "\n".join(lines)
+
+
+def generate_cues_for_text(text: str, total_duration: float) -> tuple[list[SubtitleCue], str, str]:
+    """为输入文本按字符比例估算生成字幕条目、SRT 和 VTT 字符串。"""
+    from server.utils.text_splitter import split_text_into_sentences
+
+    sentences = split_text_into_sentences(text)
+    if not sentences:
+        return [], "", ""
+
+    total_chars = sum(len(s) for s in sentences) or 1
+    durations = [max(0.2, (len(s) / total_chars) * total_duration) for s in sentences]
+
+    cues = build_cues_from_sentences(sentences, durations)
+    srt = generate_srt(cues)
+    vtt = generate_vtt(cues)
+    return cues, srt, vtt
+
+
+class SubtitleGenerator:
+    """字幕生成助手服务单例。"""
+
+    @staticmethod
+    def generate_cues_for_text(text: str, total_duration: float) -> tuple[list[SubtitleCue], str, str]:
+        return generate_cues_for_text(text, total_duration)
+
+
+subtitle_generator = SubtitleGenerator()

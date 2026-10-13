@@ -1,0 +1,11 @@
+1
+00:00:00,500 --> 00:00:02,500
+[Narrator] The morning meeting started right on time.
+
+2
+00:00:04,000 --> 00:00:06,000
+[Alice] Good morning everyone, can you hear me clearly?
+
+3
+00:00:08,000 --> 00:00:10,500
+[Bob] Yes, loud and clear. Let us review the quarterly report.

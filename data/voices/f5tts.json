@@ -1,0 +1,32 @@
+[
+  {
+    "id": "f5-chinese-female",
+    "name": "F5 清新女声 (F5 Female)",
+    "provider": "f5tts",
+    "gender": "female",
+    "language": "zh-CN",
+    "languages": ["zh-CN", "zh", "en"],
+    "category": "零样本克隆",
+    "tags": ["克隆", "清脆", "自适应"],
+    "styles": [],
+    "description": "F5-TTS 官方非自回归零样本克隆预置标准女声参考音色",
+    "preview_url": null,
+    "is_recommended": true,
+    "is_clone": false
+  },
+  {
+    "id": "f5-chinese-male",
+    "name": "F5 沉稳男声 (F5 Male)",
+    "provider": "f5tts",
+    "gender": "male",
+    "language": "zh-CN",
+    "languages": ["zh-CN", "zh", "en"],
+    "category": "零样本克隆",
+    "tags": ["克隆", "沉稳", "男声"],
+    "styles": [],
+    "description": "F5-TTS 官方非自回归零样本克隆预置标准男声参考音色",
+    "preview_url": null,
+    "is_recommended": true,
+    "is_clone": false
+  }
+]
