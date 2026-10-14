@@ -18,6 +18,7 @@ async def list_extended_models():
         "engine": "auto",
         "enable": True,
         "type": "alias",
+        "categories": ["PresetTTS"],
         "description": "自动路由到默认启用的 TTS 引擎",
     })
     models.append({
@@ -26,6 +27,7 @@ async def list_extended_models():
         "engine": "auto",
         "enable": True,
         "type": "alias",
+        "categories": ["PresetTTS"],
         "description": "自动路由到高音质 TTS 引擎",
     })
 
@@ -40,7 +42,6 @@ async def list_extended_models():
                 "preload": cfg.preload,
                 "keep_alive": cfg.keep_alive,
                 "categories": cfg.categories,
-                "languages": cfg.languages,
                 "default_voice": cfg.default_voice,
                 "type": "engine",
                 "description": f"{cfg.engine.upper()} 语音合成引擎",

@@ -21,8 +21,9 @@ def test_config_loading():
     assert edgetts_cfg.engine == "edgetts"
     assert edgetts_cfg.is_cloud is True
     assert edgetts_cfg.keep_alive == -1
-    assert "WebTTS" in edgetts_cfg.categories
+    assert "PresetTTS" in edgetts_cfg.categories
     assert "zh" in edgetts_cfg.languages
+    assert "en" in edgetts_cfg.languages
     assert edgetts_cfg.default_voice == "zh-CN-XiaoxiaoNeural"
 
 
@@ -146,3 +147,27 @@ def test_driver_alias_mapping():
     c3 = EngineConfig("test-cosy", {"driver": "cosy-voice"})
     assert c3.driver == "cosy-voice"
     assert c3.engine == "cosyvoice"
+
+
+def test_categories_and_auto_language_deduction():
+    # 1. 省略 categories 与 languages 时的自动推导
+    c_edge = EngineConfig("test-edge", {"driver": "edgetts"})
+    assert c_edge.categories == ["PresetTTS"]
+    assert "zh" in c_edge.languages
+    assert "en" in c_edge.languages
+    assert "ja" in c_edge.languages
+
+    # 2. 显式指定 VoiceCloneTTS 与特定语言
+    c_f5 = EngineConfig(
+        "test-f5",
+        {
+            "driver": "f5tts",
+            "capabilities": {
+                "categories": ["VoiceCloneTTS"],
+                "languages": "zh, en",
+            },
+        },
+    )
+    assert c_f5.categories == ["VoiceCloneTTS"]
+    assert c_f5.languages == ["zh", "en"]
+

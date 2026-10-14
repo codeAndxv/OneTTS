@@ -40,6 +40,9 @@ def test_extended_models_authorized(client):
     assert data["total"] > 0
     ids = [m["id"] for m in data["data"]]
     assert "tts-1" in ids
+    # 验证语言已完全下沉至音色字典，模型层不再包含 languages 字段
+    for m in data["data"]:
+        assert "languages" not in m
 
 
 def test_info_authorized(client):

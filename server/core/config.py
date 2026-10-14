@@ -1,5 +1,6 @@
 """配置加载与管理。"""
 
+import json
 from pathlib import Path
 from typing import Any
 import yaml
@@ -85,6 +86,32 @@ DRIVER_ALIAS_MAP: dict[str, str] = {
 }
 
 
+def deduce_languages_from_voice_registry(driver_or_engine: str) -> list[str]:
+    """从本地 data/voices/{driver}.json 音色数据字典中自动提取支持的语言列表并集。"""
+    voices_dir = PROJECT_ROOT / "data" / "voices"
+    candidates = [driver_or_engine, DRIVER_ALIAS_MAP.get(driver_or_engine, driver_or_engine)]
+    for cand in candidates:
+        if not cand:
+            continue
+        json_path = voices_dir / f"{cand}.json"
+        if json_path.exists():
+            try:
+                items = json.loads(json_path.read_text(encoding="utf-8"))
+                found_langs: set[str] = set()
+                for it in items:
+                    if isinstance(it, dict):
+                        lang = it.get("language")
+                        if lang:
+                            found_langs.add(lang.split("-")[0].lower())
+                        for l in it.get("languages", []):
+                            found_langs.add(l.split("-")[0].lower())
+                if found_langs:
+                    return sorted(list(found_langs))
+            except Exception:
+                pass
+    return ["zh", "en"]
+
+
 class EngineConfig:
     """TTS 模型/Provider 配置项，标准支持 load 与 capabilities 分层。"""
 
@@ -127,15 +154,21 @@ class EngineConfig:
             self.preload: bool = bool(data.get("preload", False))
             self.keep_alive: int = parse_keep_alive_seconds(data.get("keep_alive", 600))
 
-        # 音色与能力属性
+        # 音色与能力属性 (三大主流形态: PresetTTS 预置音色, VoiceDesignTTS 音色设计, VoiceCloneTTS 音色复刻)
         self.default_voice: str = _get_val("default_voice", "")
         self.voice_aliases: dict[str, str] = _get_val("voice_aliases", {}) or {}
-        self.categories: list[str] = _get_val("categories", []) or []
-        langs_val = _get_val("languages", "")
-        if isinstance(langs_val, str):
-            self.languages: list[str] = [s.strip() for s in langs_val.split(",") if s.strip()]
+        raw_cats = _get_val("categories", None)
+        self.categories: list[str] = list(raw_cats) if raw_cats else ["PresetTTS"]
+
+        langs_val = _get_val("languages", None)
+        if langs_val is not None and str(langs_val).strip():
+            if isinstance(langs_val, str):
+                self.languages: list[str] = [s.strip() for s in langs_val.split(",") if s.strip()]
+            else:
+                self.languages = list(langs_val or [])
         else:
-            self.languages = list(langs_val or [])
+            # 语言属性自动推导：若 YAML 未显式手写，自动从 data/voices/{driver}.json 发音人字典中提取并集
+            self.languages = deduce_languages_from_voice_registry(self.driver or self.engine)
 
         voices_val = _get_val("voices", None)
         if isinstance(voices_val, list):

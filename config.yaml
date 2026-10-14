@@ -45,10 +45,7 @@ local-models:
 
     capabilities:
       categories:
-        - LocalTTS
-        - OnnxTTS
-        - StreamingTTS
-      languages: en, ja, zh, fr, de, es, it
+        - PresetTTS              # 预置音色合成
       default_voice: "af_bella"
 
   # 2. CosyVoice 阿里开源零样本声音克隆模型 (支持本地权重常驻或自建推理节点)
@@ -64,9 +61,8 @@ local-models:
 
     capabilities:
       categories:
-        - CloneTTS
-        - LocalTTS
-      languages: zh, en, ja, yue, ko
+        - VoiceCloneTTS          # 音色复刻 / 声音克隆
+        - PresetTTS              # 预置发音人合成
       default_voice: "cosyvoice-chinese-female"
 
   # 3. F5-TTS 清华非自回归极速声音克隆模型
@@ -82,10 +78,7 @@ local-models:
 
     capabilities:
       categories:
-        - CloneTTS
-        - LocalTTS
-        - NonAutoregressive
-      languages: zh, en
+        - VoiceCloneTTS          # 音色复刻 / 零样本声音克隆
       default_voice: "f5-chinese-female"
 
 # ─────────────────────────────────────────────────────────────
@@ -105,9 +98,7 @@ cloud-providers:
     models:
       - id: "edgetts"
         categories:
-          - WebTTS
-          - StreamingTTS
-        languages: zh, en, ja, ko, fr, de, es, it, ru, pt, yue
+          - PresetTTS            # 预置音色合成
         default_voice: "zh-CN-XiaoxiaoNeural"
 
   # 2. 官方 OpenAI 语音服务 (一 Key 激活标准 tts-1 与高清 tts-1-hd)
@@ -123,16 +114,12 @@ cloud-providers:
       - id: "tts-1"
         remote_name: "tts-1"
         categories:
-          - CloudTTS
-          - StandardOpenAI
-        languages: zh, en, ja, ko, de, fr, es, it, pt, ru
+          - PresetTTS            # 预置音色合成
         default_voice: "alloy"
       - id: "tts-1-hd"
         remote_name: "tts-1-hd"
         categories:
-          - CloudTTS
-          - StandardOpenAI
-        languages: zh, en, ja, ko, de, fr, es, it, pt, ru
+          - PresetTTS            # 预置音色合成
         default_voice: "alloy"
 
   # 3. 字节跳动 豆包 / 火山语音大模型 (商业级拟真音色)
@@ -148,7 +135,5 @@ cloud-providers:
     models:
       - id: "doubao"
         categories:
-          - CloudTTS
-          - StreamingTTS
-        languages: zh, en, yue
+          - PresetTTS            # 预置音色合成
         default_voice: "zh_female_shuangkuai"
