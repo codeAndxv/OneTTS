@@ -1,12 +1,12 @@
-# OneTTS 配置文件
+# OneTTS 模型与服务配置文件
 
 # API Key（所有接口必须携带此 key，支持 Bearer / X-API-Key）
 api_key: sk-onetts-v1-k9L3mX8QZ2sT4vA7wE1rY6u
 
-# 模型生命周期与内存管理配置（Ollama 风格智能加载与释放）
+# 模型生命周期与显存管理配置（Ollama 风格智能加载与释放）
 model_manager:
   default_keep_alive: 600        # 默认空闲存活时长（秒，支持 "10m" / 600 / -1 常驻 / 0 用完即焚）
-  max_loaded_models: 2           # 最大同时驻留内存的非常驻本地模型数
+  max_loaded_models: 2           # 最大同时驻留显存/内存的非常驻本地模型数
   cleanup_interval: 30           # 后台空闲模型回收巡检间隔（秒）
 
 # TTS 全局切片与缓存配置
@@ -23,71 +23,38 @@ TTS-Toolkit:
     max_chunk_chars: 80
     split_delimiters: "。！？!?；;\n"
 
-# TTS Provider 引擎配置（标准三层结构：基础属性 + load 加载参数 + properties 能力元数据）
-TTS-Providers:
+# ─────────────────────────────────────────────────────────────
+# 本地模型配置 (local-models)
+# Key 为对外暴露的 model_id，由用户/业务自由命名；
+# driver 指定底层模型系列（kokoro, cosyvoice, f5tts 等）；
+# 模型文件映射至 data/models/<目录名>，受 ModelManager 内存/显存调度。
+# ─────────────────────────────────────────────────────────────
+local-models:
 
-  # 1. Edge-TTS 引擎（微软 Azure Neural 语音，免显卡开箱即用，支持上百种高质量多语言音色）
-  edgetts:
-    enable: true
-    engine: edgetts
-    preload: true
-    keep_alive: -1               # 常驻就绪
-
-    load:
-      proxy: null
-      connect_timeout: 5
-
-    properties:
-      categories:
-        - WebTTS
-        - StreamingTTS
-      languages: zh, en, ja, ko, fr, de, es, it, ru, pt, yue
-      default_voice: "zh-CN-XiaoxiaoNeural"
-
-  # 2. OpenAI TTS 官方/三方中转代理引擎
-  openai:
+  # 1. Kokoro 超轻量 ONNX 引擎 (82M 超轻量，低延迟高自然度，支持 CPU / GPU)
+  kokoro-v0_19:
     enable: false
-    engine: openai
-    preload: false
-    keep_alive: 600
-
-    load:
-      base_url: "https://api.openai.com/v1"
-      api_key: ""
-      models:
-        - "tts-1"
-        - "tts-1-hd"
-
-    properties:
-      categories:
-        - CloudTTS
-        - StandardOpenAI
-      languages: zh, en, ja, ko, de, fr, es, it, pt, ru
-      default_voice: "alloy"
-
-  # 3. Kokoro 本地轻量 ONNX 引擎（82M 超轻量，低延迟高自然度）
-  kokoro:
-    enable: false
-    engine: kokoro
-    preload: false
-    keep_alive: 600
+    driver: kokoro
+    preload: false               # 启动时是否预热载入内存
+    keep_alive: 600              # 空闲 10 分钟后自动卸载释放显存/内存
 
     load:
       model_path: "data/models/kokoro-v0_19.onnx"
       voices_path: "data/models/voices.bin"
       device: cpu
 
-    properties:
+    capabilities:
       categories:
         - LocalTTS
         - OnnxTTS
+        - StreamingTTS
       languages: en, ja, zh, fr, de, es, it
       default_voice: "af_bella"
 
-  # 4. CosyVoice 阿里开源零样本声音克隆引擎
-  cosyvoice:
+  # 2. CosyVoice 阿里开源零样本声音克隆模型 (支持本地权重常驻或自建推理节点)
+  cosyvoice-300m:
     enable: false
-    engine: cosyvoice
+    driver: cosyvoice
     preload: false
     keep_alive: 600
 
@@ -95,17 +62,17 @@ TTS-Providers:
       api_url: "http://127.0.0.1:9233"
       model_dir: null
 
-    properties:
+    capabilities:
       categories:
         - CloneTTS
         - LocalTTS
       languages: zh, en, ja, yue, ko
       default_voice: "cosyvoice-chinese-female"
 
-  # 5. F5-TTS 清华非自回归极速声音克隆引擎
-  f5tts:
+  # 3. F5-TTS 清华非自回归极速声音克隆模型
+  f5tts-base:
     enable: false
-    engine: f5tts
+    driver: f5tts
     preload: false
     keep_alive: 600
 
@@ -113,7 +80,7 @@ TTS-Providers:
       api_url: "http://127.0.0.1:9998"
       model_path: "data/models/F5-TTS"
 
-    properties:
+    capabilities:
       categories:
         - CloneTTS
         - LocalTTS
@@ -121,22 +88,67 @@ TTS-Providers:
       languages: zh, en
       default_voice: "f5-chinese-female"
 
-  # 6. 豆包 / 火山引擎语音大模型（抖音/剪映商业级拟真音色）
-  doubao:
+# ─────────────────────────────────────────────────────────────
+# 云端 / Web 服务商配置 (cloud-providers)
+# 厂商账号凭据集中配置，一处配置 connection 即可激活其下全部模型；
+# 云端/Web 模型免本地权重下载，不占用本机显存，亦不受 ModelManager 淘汰管辖。
+# ─────────────────────────────────────────────────────────────
+cloud-providers:
+
+  # 1. 微软 Edge 在线高质量语音 (WebTTS 免 Key 免显卡，开箱即用支持上百种音色)
+  edge-cloud:
+    enable: true
+    driver: edgetts
+    connection:
+      proxy: null
+      connect_timeout: 5
+    models:
+      - id: "edgetts"
+        categories:
+          - WebTTS
+          - StreamingTTS
+        languages: zh, en, ja, ko, fr, de, es, it, ru, pt, yue
+        default_voice: "zh-CN-XiaoxiaoNeural"
+
+  # 2. 官方 OpenAI 语音服务 (一 Key 激活标准 tts-1 与高清 tts-1-hd)
+  openai-official:
     enable: false
-    engine: doubao
-    preload: false
-    keep_alive: 600
+    driver: openai
+    connection:
+      base_url: "https://api.openai.com/v1"
+      api_key: "sk-xxxxxx"
+      timeout: 30
+      max_retries: 3
+    models:
+      - id: "tts-1"
+        remote_name: "tts-1"
+        categories:
+          - CloudTTS
+          - StandardOpenAI
+        languages: zh, en, ja, ko, de, fr, es, it, pt, ru
+        default_voice: "alloy"
+      - id: "tts-1-hd"
+        remote_name: "tts-1-hd"
+        categories:
+          - CloudTTS
+          - StandardOpenAI
+        languages: zh, en, ja, ko, de, fr, es, it, pt, ru
+        default_voice: "alloy"
 
-    load:
-      appid: ""
-      access_token: ""
-      cluster: "volcano_tts"
+  # 3. 字节跳动 豆包 / 火山语音大模型 (商业级拟真音色)
+  doubao-volcano:
+    enable: false
+    driver: doubao
+    connection:
       api_url: "https://openspeech.bytedance.com/api/v1/tts"
-
-    properties:
-      categories:
-        - CloudTTS
-        - StreamingTTS
-      languages: zh, en, yue
-      default_voice: "zh_female_shuangkuai"
+      appid: "your_appid"
+      access_token: "your_access_token"
+      cluster: "volcano_tts"
+      timeout: 30
+    models:
+      - id: "doubao"
+        categories:
+          - CloudTTS
+          - StreamingTTS
+        languages: zh, en, yue
+        default_voice: "zh_female_shuangkuai"

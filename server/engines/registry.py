@@ -2,7 +2,7 @@
 
 import logging
 from typing import Type
-from server.core.config import app_config
+from server.core.config import DRIVER_ALIAS_MAP, app_config
 from server.engines.base import BaseTTSEngine
 from server.engines.edgetts_engine import EdgeTTSEngine
 from server.engines.openai_engine import OpenAITTSEngine
@@ -30,25 +30,25 @@ def register_engine_class(engine_type: str, engine_cls: Type[BaseTTSEngine]) -> 
 
 
 def get_engine(provider_name: str) -> BaseTTSEngine:
-    """按 provider 名称获取或延迟初始化引擎实例。"""
+    """按 provider / model 名称获取或延迟初始化引擎实例。"""
     if provider_name in _ACTIVE_INSTANCES:
         return _ACTIVE_INSTANCES[provider_name]
 
-    if provider_name not in app_config.providers:
-        # 如果传入的是通用的 tts-1 / tts-1-hd，默认路由至首个启用的引擎或 edgetts
+    try:
+        cfg = app_config.get_provider_config(provider_name)
+    except ValueError:
+        # 如果传入的是通用的 tts-1 / tts-1-hd 且未在配置中配置，默认路由至首个启用的引擎或 edgetts
         if provider_name in ("tts-1", "tts-1-hd"):
-            # 找到第一个启用的 provider
-            for name, cfg in app_config.providers.items():
-                if cfg.enable:
+            for name, c in app_config.providers.items():
+                if c.enable:
                     return get_engine(name)
             return get_engine("edgetts")
-        raise ValueError(f"未找到配置的 TTS Provider: {provider_name}")
+        raise
 
-    cfg = app_config.providers[provider_name]
-    engine_type = cfg.engine
+    engine_type = DRIVER_ALIAS_MAP.get(cfg.engine, cfg.engine)
 
     if engine_type not in _ENGINE_CLASSES:
-        raise ValueError(f"不支持的 TTS 引擎类型: {engine_type}")
+        raise ValueError(f"不支持的 TTS 引擎类型: {engine_type}，当前可用: {list(_ENGINE_CLASSES)}")
 
     instance = _ENGINE_CLASSES[engine_type](name=provider_name, config=cfg.combined_config)
     _ACTIVE_INSTANCES[provider_name] = instance

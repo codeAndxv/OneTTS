@@ -77,30 +77,55 @@ class TTSToolkitConfig:
         self.text_splitter = TextSplitterConfig(data.get("text_splitter", {}))
 
 
-class EngineConfig:
-    """TTS Provider 配置项，标准支持 load 与 properties 分层。"""
+DRIVER_ALIAS_MAP: dict[str, str] = {
+    "edge-tts": "edgetts",
+    "openai-compatible": "openai",
+    "f5-tts": "f5tts",
+    "cosy-voice": "cosyvoice",
+}
 
-    def __init__(self, name: str, data: dict | None = None):
+
+class EngineConfig:
+    """TTS 模型/Provider 配置项，标准支持 load 与 capabilities 分层。"""
+
+    def __init__(
+        self,
+        name: str,
+        data: dict | None = None,
+        is_cloud: bool = False,
+        provider_group: str | None = None,
+    ):
         data = data or {}
         self.name = name
+        self.provider_group = provider_group or name
         self.raw_config: dict[str, Any] = data
+        self.is_cloud = is_cloud
+        self.type = "cloud" if is_cloud else data.get("type", "local")
 
         load_conf = data.get("load", {}) if isinstance(data.get("load"), dict) else {}
-        props_conf = data.get("properties", {}) if isinstance(data.get("properties"), dict) else {}
+        caps_conf = data.get("capabilities", {}) if isinstance(data.get("capabilities"), dict) else {}
         self.load: dict[str, Any] = load_conf
-        self.properties: dict[str, Any] = props_conf
+        self.capabilities: dict[str, Any] = caps_conf
 
         def _get_val(key: str, default: Any = None) -> Any:
             if key in load_conf:
                 return load_conf[key]
-            if key in props_conf:
-                return props_conf[key]
+            if key in caps_conf:
+                return caps_conf[key]
             return data.get(key, default)
 
-        self.enable: bool = bool(data.get("enable", data.get("enabled", True)))
-        self.engine: str = data.get("engine", name)
-        self.preload: bool = bool(data.get("preload", False))
-        self.keep_alive: int = parse_keep_alive_seconds(data.get("keep_alive", 600))
+        self.enable: bool = bool(data.get("enable", True))
+        raw_driver = data.get("driver") or data.get("engine") or name
+        self.driver: str = raw_driver
+        self.engine: str = DRIVER_ALIAS_MAP.get(raw_driver, raw_driver)
+
+        # 默认生命周期策略：云端/Web免卸载 keep_alive = -1，本地模型按配置
+        if is_cloud or self.type == "cloud":
+            self.preload: bool = bool(data.get("preload", True))
+            self.keep_alive: int = -1
+        else:
+            self.preload: bool = bool(data.get("preload", False))
+            self.keep_alive: int = parse_keep_alive_seconds(data.get("keep_alive", 600))
 
         # 音色与能力属性
         self.default_voice: str = _get_val("default_voice", "")
@@ -125,15 +150,16 @@ class EngineConfig:
         self.appid: str = _get_val("appid", "")
         self.access_token: str = _get_val("access_token", "")
         self.cluster: str = _get_val("cluster", "volcano_tts")
+        self.remote_name: str = _get_val("remote_name", name)
         self.models: list[str] = _get_val("models", []) or []
         self.model_path: str = _get_val("model_path", "")
         self.voices_path: str = _get_val("voices_path", "")
         self.device: str = _get_val("device", "cpu")
 
-        # 组合配置字典：确保引擎适配器开箱即用读取 load 与 properties 中参数
+        # 组合配置字典：确保引擎适配器开箱即用读取 load 与 capabilities 中参数
         combined = dict(data)
         combined.update(load_conf)
-        combined.update(props_conf)
+        combined.update(caps_conf)
         self.combined_config: dict[str, Any] = combined
 
 
@@ -153,18 +179,75 @@ class AppConfig:
         self.model_manager = ModelManagerConfig(self._data.get("model_manager", {}))
 
         # TTS Toolkit 配置
-        raw_toolkit = self._data.get("TTS-Toolkit", self._data.get("tts_toolkit", {}))
+        raw_toolkit = self._data.get("TTS-Toolkit", {})
         self.tts_toolkit = TTSToolkitConfig(raw_toolkit)
 
-        # TTS Providers 配置
+        # TTS 模型配置 (纯粹现代架构：local-models + cloud-providers)
         self.providers: dict[str, EngineConfig] = {}
-        for name, prov_conf in self._data.get("TTS-Providers", {}).items():
-            self.providers[name] = EngineConfig(name, prov_conf)
+        self.local_models: dict[str, EngineConfig] = {}
+        self.cloud_providers: dict[str, dict[str, Any]] = {}
+
+        # 1. 解析本地模型 (local-models)
+        raw_local = self._data.get("local-models", {})
+        if isinstance(raw_local, dict):
+            for model_id, model_conf in raw_local.items():
+                if not isinstance(model_conf, dict):
+                    continue
+                cfg = EngineConfig(model_id, model_conf, is_cloud=False)
+                self.local_models[model_id] = cfg
+                self.providers[model_id] = cfg
+
+        # 2. 解析云端服务商 (cloud-providers) 并自动多模型展平
+        raw_cloud = self._data.get("cloud-providers", {})
+        if isinstance(raw_cloud, dict):
+            for prov_name, prov_conf in raw_cloud.items():
+                if not isinstance(prov_conf, dict):
+                    continue
+                self.cloud_providers[prov_name] = prov_conf
+                if not prov_conf.get("enable", True):
+                    continue
+
+                driver = prov_conf.get("driver") or prov_conf.get("engine", "openai")
+                conn = prov_conf.get("connection", {}) if isinstance(prov_conf.get("connection"), dict) else {}
+                models_list = prov_conf.get("models", [])
+
+                for m in models_list:
+                    if isinstance(m, str):
+                        m_id = m
+                        m_conf = {}
+                    elif isinstance(m, dict):
+                        m_id = m.get("id") or m.get("name")
+                        m_conf = m
+                    else:
+                        continue
+
+                    if not m_id:
+                        continue
+
+                    # 展平构建单模型配置
+                    merged_conf: dict[str, Any] = {
+                        "enable": True,
+                        "driver": driver,
+                        "type": "cloud",
+                        "provider": prov_name,
+                    }
+                    merged_conf.update(conn)
+                    merged_conf.update(m_conf)
+                    if "capabilities" in m_conf:
+                        merged_conf["capabilities"] = m_conf["capabilities"]
+
+                    cfg = EngineConfig(m_id, merged_conf, is_cloud=True, provider_group=prov_name)
+                    self.providers[m_id] = cfg
 
     def get_provider_config(self, name: str) -> EngineConfig:
         if name in self.providers:
             return self.providers[name]
-        raise ValueError(f"未知 TTS Provider: {name}，当前可用: {list(self.providers)}")
+        # 支持去除命名空间前缀或按短名查找
+        short_name = name.split("/")[-1]
+        for k, v in self.providers.items():
+            if k == short_name or k.split("/")[-1] == short_name:
+                return v
+        raise ValueError(f"未知 TTS Provider / 模型: {name}，当前可用: {list(self.providers)}")
 
 
 class Settings(BaseSettings):

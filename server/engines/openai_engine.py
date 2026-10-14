@@ -26,7 +26,7 @@ class OpenAITTSEngine(BaseTTSEngine):
         super().__init__(name, config)
         self.base_url = (self.config.get("base_url") or "https://api.openai.com/v1").rstrip("/")
         self.api_key = self.config.get("api_key") or ""
-        self.default_model = (self.config.get("models") or ["tts-1"])[0]
+        self.default_model = self.config.get("remote_name") or (self.config.get("models") or ["tts-1"])[0]
 
     async def synthesize(
         self,
